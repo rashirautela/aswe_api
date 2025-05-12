@@ -67,6 +67,9 @@ if(!isset($_GET['type'])){
           echo '<label>Manufacturer:</label>';
           echo '<select class="form-control" name="manufacturer">';
           $result = make_api_call("GET", "fetch_active_manufacturers");
+          echo '<pre>';
+          echo "$result";
+          echo '</pre>';
           foreach($result as $manufacturer){
                $value = str_replace(" ","_",$manufacturer);
                echo '<option value="'.htmlspecialchars($value).'">'.htmlspecialchars($manufacturer).'</option>';
