@@ -69,7 +69,8 @@ if(!isset($_GET['type'])){
           $result = make_api_call("GET", "fetch_active_manufacturers");
           foreach($result as $manufacturer){
                $value = str_replace(" ","_",$manufacturer);
-               echo '<option value="'.$value.'">'.$manufacturer.'</option>';
+               echo '<option value="'.htmlspecialchars($value).'">'.htmlspecialchars($manufacturer).'</option>';
+
           }
           echo '<option value="all">All Manufacturers</option>';
           echo '</select>';
@@ -79,7 +80,8 @@ if(!isset($_GET['type'])){
           $result = make_api_call("GET", "fetch_active_device_types");
           foreach($result as $device_type){
                $value = str_replace(" ","_",$device_type);
-               echo '<option value="'.$value.'">'.$device_type.'</option>';
+               echo '<option value="'.htmlspecialchars($value).'">'.htmlspecialchars($device_type).'</option>';
+
           }
           echo '<option value="all">All Devices</option>';
           echo '</select>';
@@ -89,7 +91,7 @@ if(!isset($_GET['type'])){
           $result = make_api_call("GET", "fetch_active_manufacturers");
           foreach($result as $manufacturer){
                $value = str_replace(" ","_",$manufacturer);
-               echo '<option value="'.$value.'">'.$manufacturer.'</option>';
+               echo '<option value="'.htmlspecialchars($value).'">'.htmlspecialchars($manufacturer).'</option>';
           }
           echo '<option value="all">All Manufacturers</option>';
           echo '</select>';
