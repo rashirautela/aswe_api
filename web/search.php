@@ -41,21 +41,7 @@
 <section id="feature">
      <div class="container">
 <?php
-
-function get_db($db){ 
-     $hostname = "localhost";
-     $username = "web_user";
-     $password = "*k8WZ!kK.zlgdo(0";
-     $dblink = new mysqli($hostname,$username,$password,$db);
-     if (mysqli_connect_error()){
-         die("Error connecting to the database: ".mysqli_connect_error());
-     }
-     return $dblink;
-}
-
-$activeDev = 'd.auto_id NOT IN (SELECT device_id FROM device_status)';
-$activeManu = "d.manufacturer NOT IN (SELECT manufacturer FROM manufacturer_status) UNION (SELECT manufacturer FROM manufacturer_status WHERE status = 'active')";
-$activeType = "d.device_type NOT IN (SELECT device_type FROM device_type_status) UNION (SELECT device_type FROM device_type_status WHERE status = 'active')";
+include "data.php";
 
 if(!isset($_GET['type'])){
      echo '<a class="btn btn-primary" href="search.php?type=device">Search by Device Type </a>   ';
@@ -80,35 +66,30 @@ if(!isset($_GET['type'])){
      } elseif ($type == "manufacturer") {
           echo '<label>Manufacturer:</label>';
           echo '<select class="form-control" name="manufacturer">';
-          $sql = "SELECT DISTINCT manufacturer FROM devices_try d WHERE $activeDev AND $activeManu ORDER BY manufacturer";
-          $dblink = get_db("equipment");
-          $result = $dblink->query($sql);
-          while ($data = $result->fetch_array(MYSQLI_ASSOC)){
-               $value = str_replace(" ","_",$data['manufacturer']);
-               echo '<option value="'.$value.'">'.$data['manufacturer'].'</option>';
+          $result = make_api_call("GET", "fetch_active_manufacturers");
+          foreach($result as $manufacturer){
+               $value = str_replace(" ","_",$manufacturer);
+               echo '<option value="'.$value.'">'.$manufacturer.'</option>';
           }
           echo '<option value="all">All Manufacturers</option>';
           echo '</select>';
      } else {
           echo '<label>Device:</label>';
           echo '<select class="form-control" name="device">';
-          $sql = "SELECT DISTINCT device_type FROM devices_try d WHERE $activeDev AND $activeType ORDER BY device_type";
-          $dblink = get_db("equipment");
-          $result = $dblink->query($sql);
-          while ($data = $result->fetch_array(MYSQLI_ASSOC)){
-               $value = str_replace(" ","_",$data['device_type']);
-               echo '<option value="'.$value.'">'.$data['device_type'].'</option>';
+          $result = make_api_call("GET", "fetch_active_device_types");
+          foreach($result as $device_type){
+               $value = str_replace(" ","_",$device_type);
+               echo '<option value="'.$value.'">'.$device_type.'</option>';
           }
           echo '<option value="all">All Devices</option>';
           echo '</select>';
 
           echo '<label>Manufacturer:</label>';
           echo '<select class="form-control" name="manufacturer">';
-          $sql = "SELECT DISTINCT manufacturer FROM devices_try d WHERE $activeDev AND $activeManu ORDER BY manufacturer";
-          $result = $dblink->query($sql);
-          while ($data = $result->fetch_array(MYSQLI_ASSOC)){
-               $value = str_replace(" ","_",$data['manufacturer']);
-               echo '<option value="'.$value.'">'.$data['manufacturer'].'</option>';
+          $result = make_api_call("GET", "fetch_active_manufacturers");
+          foreach($result as $manufacturer){
+               $value = str_replace(" ","_",$manufacturer);
+               echo '<option value="'.$value.'">'.$manufacturer.'</option>';
           }
           echo '<option value="all">All Manufacturers</option>';
           echo '</select>';
@@ -124,92 +105,35 @@ if (isset($_GET['submit']) && $_GET['submit'] == "search") {
      echo '<table id="equipmentTable" class="table table-striped table-bordered display nowrap" style="width:100%">';
      echo '<thead><tr><th>Device Type</th><th>Manufacturer</th><th>Serial Number</th><th>Action</th></tr></thead><tbody>';
      
-     $dblink = get_db("equipment");
      $type = $_GET['type'];
-     $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-     $limit = 100;
-     $offset = ($page - 1) * $limit;
 
      if ($type == "serialNum") {
-          $serial = $dblink->real_escape_string($_GET['serial_number']);
-          $sql = "SELECT d.*, 'Active' AS status FROM devices_try d WHERE d.serial_number='$serial' AND $activeDev";
+          $serial_number = $_GET['serial_number'];
+          $payload = http_build_query(['serial_number'=>$serial_number]);
+          $result = make_api_call("POST", "search_serial_number", $payload);
      } elseif ($type == "all") {
           $status = $_GET['status'];
-          if ($status == 'active') {
-               $sql = "SELECT d.*, 'Active' AS status FROM devices_try d 
-               WHERE d.auto_id NOT IN (SELECT device_id FROM device_status) 
-               AND d.manufacturer NOT IN (SELECT manufacturer FROM manufacturer_status) 
-               AND d.device_type NOT IN (SELECT device_type FROM device_type_status)";
-          } elseif ($status == 'inactive') {
-               $sql = "SELECT d.*, 'Inactive' AS status FROM devices_try d 
-               WHERE d.auto_id IN (SELECT device_id FROM device_status) 
-               OR d.manufacturer IN (SELECT manufacturer FROM manufacturer_status WHERE status = 'inactive') 
-               OR d.device_type IN (SELECT device_type FROM device_type_status WHERE status = 'inactive')";
-          } else {
-               $sql = "SELECT d.*, IF(ds.device_id IS NULL,'Active','Inactive') AS status FROM devices_try d 
-               LEFT JOIN device_status ds ON d.auto_id = ds.device_id";
-          }
+          $payload = http_build_query(['status'=>$status]);
+          $result = make_api_call("POST", "search_all", $payload);
      } elseif ($type == "manufacturer") {
-          $man = str_replace("_"," ",$_GET['manufacturer']);
-          $mCond = ($man === 'all') ? '1' : "d.manufacturer='$man'";
-          $sql = "SELECT d.*, 'Active' AS status FROM devices_try d 
-               WHERE $mCond AND d.auto_id NOT IN (SELECT device_id FROM device_status) 
-               AND d.manufacturer NOT IN (SELECT manufacturer FROM manufacturer_status) 
-               AND d.device_type NOT IN (SELECT device_type FROM device_type_status) 
-               OR d.manufacturer IN (SELECT manufacturer FROM manufacturer_status WHERE $mCond AND status = 'active')";
+          $manufacturer = $_GET['manufacturer'];
+          $payload = http_build_query(['manufacturer'=>$manufacturer]);
+          $result = make_api_call("POST", "search_manufacturer", $payload);
      } else {
-          $dev = str_replace("_"," ",$_GET['device']);
-          $man = str_replace("_"," ",$_GET['manufacturer']);
-          $dCond = ($dev === 'all') ? '1' : "d.device_type='$dev'";
-          $mCond = ($man === 'all') ? '1' : "d.manufacturer='$man'";
-          $sql = "SELECT d.*, 'Active' AS status FROM devices_try d 
-               WHERE $dCond AND $mCond 
-               AND d.auto_id NOT IN (SELECT device_id FROM device_status) 
-               AND d.manufacturer NOT IN (SELECT manufacturer FROM manufacturer_status) 
-               AND d.device_type NOT IN (SELECT device_type FROM device_type_status) 
-               OR d.manufacturer IN (SELECT manufacturer FROM manufacturer_status WHERE $mCond AND status = 'active') 
-               OR d.device_type IN (SELECT device_type FROM device_type_status WHERE $dCond AND status = 'active')";
+          $device_type = $_GET['device_type'];
+          $manufacturer = $_GET['manufacturer'];
+          $payload = http_build_query(['device_type'=>$device_type, 'manufacturer'=>$manufacturer]);
+          $result = make_api_call("POST", "search_device_type", $payload);
      }
 
-     // Get total count
-     $count_sql = "SELECT COUNT(*) as total FROM ($sql) as count_query";
-     $count_result = $dblink->query($count_sql);
-     $total_rows = $count_result->fetch_assoc()['total'];
-     $total_pages = ceil($total_rows / $limit);
-
-     // Apply LIMIT for pagination
-     $sql .= " LIMIT $limit OFFSET $offset";
-     $result = $dblink->query($sql);
-
-     while ($data = $result->fetch_array(MYSQLI_ASSOC)) {
+     foreach($result as $data){
           echo '<tr>';
-          echo '<td>'.$data['device_type'].'</td><td>'.$data['manufacturer'].'</td><td>'.$data['serial_number'].'</td>';
-          echo '<td><a class="btn btn-success" href="view.php?eid='.$data['auto_id'].'">View</a></td>';
+          echo '<td>'.$result['device_type'].'</td><td>'.$result['manufacturer'].'</td><td>'.$result['serial_number'].'</td>';
+          echo '<td><a class="btn btn-success" href="view.php?eid='.$result['auto_id'].'">View</a></td>';
           echo '</tr>';
      }
      echo '</tbody></table>';
-
-     //page links
-     echo '<div class="text-center" style="margin-top:15px;">';
-
-     $prev = max(1, $page - 1);
-     $next = min($total_pages, $page + 1);
-
-     $original_get = $_GET; 
-
-     $_GET['page'] = $prev;
-     $prev_link = '?' . http_build_query($original_get);
-
-     $_GET['page'] = $next;
-     $next_link = '?' . http_build_query($original_get);
-
-     echo '<a href="'.$prev_link.'" class="btn btn-sm btn-outline-secondary" style="margin-right:5px;">&laquo; Prev</a>';
-     echo '<span style="font-size:14px;">Page <strong>'.$page.'</strong> of '.$total_pages.'</span>';
-     echo '<a href="'.$next_link.'" class="btn btn-sm btn-outline-secondary" style="margin-left:5px;">Next &raquo;</a>';
-
      echo '</div>';
-
-
 }
 ?>
      </div>
