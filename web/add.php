@@ -9,6 +9,7 @@
 <body id="top" data-spy="scroll" data-target=".navbar-collapse" data-offset="50">
 
 <section class="navbar custom-navbar navbar-fixed-top" role="navigation">
+  <div>Hello</div>
   <div class="container">
     <div class="navbar-header">
       <button class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
